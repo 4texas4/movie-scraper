@@ -16,15 +16,13 @@ html, body { width: 100%; height: 100%; background: #000; font-family: system-ui
 #loader-bg {
   position: absolute; inset: 0;
   background-size: cover; background-position: center;
-  transition: opacity .6s ease;
-  opacity: 0;
+  transition: opacity .6s ease; opacity: 0;
 }
 .spinner {
   position: relative; z-index: 1;
   width: 72px; height: 72px;
   border: 5px solid rgba(255,255,255,.15);
-  border-top-color: #fff;
-  border-radius: 50%;
+  border-top-color: #fff; border-radius: 50%;
   animation: spin .9s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -33,17 +31,19 @@ html, body { width: 100%; height: 100%; background: #000; font-family: system-ui
 #player { position: fixed; inset: 0; display: none; background: #000; }
 video { width: 100%; height: 100%; display: block; }
 
-#player { position: fixed; inset: 0; display: none; background: #000; }
-video { width: 100%; height: 100%; display: block; }
+#usage {
+  position: fixed; inset: 0; display: none; flex-direction: column;
+  align-items: center; justify-content: center; text-align: center;
+  background: #000; gap: 10px;
+}
+#usage p { font-size: 1.05rem; color: rgba(255,255,255,.65); line-height: 2; }
 
 #err {
   position: fixed; inset: 0; display: none; flex-direction: column;
   align-items: center; justify-content: center; text-align: center; background: #000;
 }
 #err-title { font-size: 2.4rem; font-weight: 700; color: #fff; margin-bottom: 18px; }
-#err-link {
-  font-size: 1.1rem; color: #60a5fa; text-decoration: underline; cursor: pointer;
-}
+#err-link { font-size: 1.1rem; color: #60a5fa; text-decoration: underline; cursor: pointer; }
 #err-link:hover { color: #93c5fd; }
 #err-detail {
   position: absolute; bottom: 28px; left: 50%; transform: translateX(-50%);
@@ -59,13 +59,23 @@ video { width: 100%; height: 100%; display: block; }
   <div class="spinner"></div>
   <div id="loader-text">Loading stream...</div>
 </div>
-<div id="player">
-  <video id="v" controls autoplay playsinline></video>
+
+<div id="usage">
+  <p>
+    <span style="color:#fff;font-size:1.2rem">Stream</span><br><br>
+    <code style="color:rgba(255,255,255,.8)">?id=550</code> &nbsp;— movie<br>
+    <code style="color:rgba(255,255,255,.8)">?id=456&amp;s=1&amp;e=1</code> &nbsp;— TV episode
+  </p>
 </div>
+
 <div id="err">
   <div id="err-title">Error Occurred</div>
   <a id="err-link" href="#">Try vidsrc.xyz instead?</a>
   <div id="err-detail"></div>
+</div>
+
+<div id="player">
+  <video id="v" controls autoplay playsinline></video>
 </div>
 
 <script>
@@ -94,6 +104,17 @@ function showPlayer() {
   document.getElementById('player').style.display = 'block';
 }
 
+function showErr(msg) {
+  clearInterval(msgTimer);
+  document.getElementById('loader').style.display = 'none';
+  document.getElementById('err').style.display = 'flex';
+  document.getElementById('err-detail').textContent = msg || '';
+  var vidsrcUrl = s
+    ? 'https://vidsrc.xyz/embed/tv?tmdb=' + id + '&season=' + s + '&episode=' + (e || '1')
+    : 'https://vidsrc.xyz/embed/movie?tmdb=' + id;
+  document.getElementById('err-link').href = vidsrcUrl;
+}
+
 function loadBackdrop(id, isTv) {
   var type = isTv ? 'tv' : 'movie';
   fetch('https://api.themoviedb.org/3/' + type + '/' + id + '?api_key=' + TMDB_KEY)
@@ -110,38 +131,20 @@ function loadBackdrop(id, isTv) {
     .catch(function() {});
 }
 
-function showErr(msg, hideLink) {
+if (!id) {
   clearInterval(msgTimer);
   document.getElementById('loader').style.display = 'none';
-  var el = document.getElementById('err');
-  el.style.display = 'flex';
-  document.getElementById('err-detail').textContent = msg || '';
-  var link = document.getElementById('err-link');
-  if (hideLink) {
-    link.style.display = 'none';
-  } else {
-    var vidsrcUrl = s
-      ? 'https://vidsrc.xyz/embed/tv?tmdb=' + id + '&season=' + s + '&episode=' + (e || '1')
-      : 'https://vidsrc.xyz/embed/movie?tmdb=' + id;
-    link.href = vidsrcUrl;
-  }
-}
-
-function fallback(msg) { showErr(msg); }
-
-if (!id) {
-  document.getElementById('err-title').textContent = 'Usage';
-  showErr('?id=550 for movies  |  ?id=456&s=1&e=1 for TV', true);
+  document.getElementById('usage').style.display = 'flex';
 } else {
   loadBackdrop(id, !!s);
   var api = '/api?' + (s ? 'id='+id+'&s='+s+'&e='+(e||'1') : 'id='+id);
   fetch(api)
     .then(function(r) { return r.json(); })
     .then(function(d) {
-      if (d.error) return fallback(d.error);
+      if (d.error) return showErr(d.error);
       play(d.url);
     })
-    .catch(function(err) { fallback(err.message); });
+    .catch(function(err) { showErr(err.message); });
 }
 
 function play(rawUrl) {
@@ -156,12 +159,12 @@ function play(rawUrl) {
       v.play().catch(function(){});
     });
     hls.on(Hls.Events.ERROR, function(_, d) {
-      if (d.fatal) fallback(d.details || 'HLS fatal error');
+      if (d.fatal) showErr(d.details || 'HLS fatal error');
     });
   } else {
     v.src = src;
     v.addEventListener('canplay', showPlayer, { once: true });
-    v.play().catch(function(err) { fallback(err.message); });
+    v.play().catch(function(err) { showErr(err.message); });
   }
 }
 </script>
